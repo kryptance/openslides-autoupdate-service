@@ -24,3 +24,5 @@ require (
 	golang.org/x/sys v0.40.0 // indirect
 	golang.org/x/text v0.33.0 // indirect
 )
+
+replace github.com/OpenSlides/openslides-go => github.com/kryptance/openslides-go v0.0.0-20260116201606-2e180cc466c5

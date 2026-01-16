@@ -93,9 +93,43 @@ func (m Motion) see(ctx context.Context, ds *dsfetch.Fetch, motionIDs ...int) ([
 				return nil, fmt.Errorf("fetching locked_from_inside: %w", err)
 			}
 
+			// Check if meeting has decision archive enabled (for logged-in users)
+			var archiveEnabled bool
+			if requestUser != 0 {
+				archiveEnabled, err = ds.Meeting_EnableDecisionArchive(meetingID).Value(ctx)
+				if err != nil {
+					return nil, fmt.Errorf("fetching enable_decision_archive: %w", err)
+				}
+			}
+
 			step1Allowed, err := eachCondition(ids, func(id int) (bool, error) {
 				if perms.Has(perm.MotionCanSee) {
 					return true, nil
+				}
+
+				// Check archive visibility for logged-in users (main motions only)
+				if requestUser != 0 && archiveEnabled {
+					leadMotionID, err := ds.Motion_LeadMotionID(id).Value(ctx)
+					if err != nil {
+						return false, fmt.Errorf("fetching lead_motion_id: %w", err)
+					}
+
+					// Only main motions (no lead_motion_id) can be archive-visible
+					if _, hasLead := leadMotionID.Value(); !hasLead {
+						stateID, err := ds.Motion_StateID(id).Value(ctx)
+						if err != nil {
+							return false, fmt.Errorf("fetching state_id for archive check: %w", err)
+						}
+
+						publishToArchive, err := ds.MotionState_PublishToArchive(stateID).Value(ctx)
+						if err != nil {
+							return false, fmt.Errorf("fetching publish_to_archive: %w", err)
+						}
+
+						if publishToArchive {
+							return true, nil
+						}
+					}
 				}
 
 				if lockedMeeting {
@@ -144,37 +178,86 @@ func (m Motion) see(ctx context.Context, ds *dsfetch.Fetch, motionIDs ...int) ([
 					return ids, nil
 				}
 
-				hasIsSubmitterRestriction := false
-				for _, restriction := range restrictions {
-					if restriction == "is_submitter" {
-						hasIsSubmitterRestriction = true
-						continue
+				// Check if this state publishes to archive - logged-in users bypass restrictions for main motions
+				if requestUser != 0 && archiveEnabled {
+					publishToArchive, err := ds.MotionState_PublishToArchive(stateID).Value(ctx)
+					if err != nil {
+						return nil, fmt.Errorf("checking publish_to_archive for restrictions bypass: %w", err)
 					}
 
-					if perms.Has(perm.TPermission(restriction)) {
-						return ids, nil
-					}
-				}
-				if hasIsSubmitterRestriction {
-					allowed, err := eachCondition(ids, func(motionID int) (bool, error) {
-						submitter, err := isSubmitter(ctx, ds, requestUser, motionID)
+					if publishToArchive {
+						// Filter to main motions only (no lead_motion_id) for archive visibility
+						archiveAllowed, err := eachCondition(ids, func(motionID int) (bool, error) {
+							leadMotionID, err := ds.Motion_LeadMotionID(motionID).Value(ctx)
+							if err != nil {
+								return false, fmt.Errorf("fetching lead_motion_id for archive bypass: %w", err)
+							}
+							_, hasLead := leadMotionID.Value()
+							return !hasLead, nil
+						})
 						if err != nil {
-							return false, fmt.Errorf("checking for motion submitter of motion %d: %w", motionID, err)
+							return nil, fmt.Errorf("filtering main motions for archive bypass: %w", err)
 						}
 
-						return submitter, nil
-					})
-					if err != nil {
-						return nil, fmt.Errorf("checking if user is submitter: %w", err)
-					}
+						// For non-main motions (amendments), continue with regular restriction checks
+						archiveSet := set.New(archiveAllowed...)
+						var nonArchiveIDs []int
+						for _, id := range ids {
+							if !archiveSet.Has(id) {
+								nonArchiveIDs = append(nonArchiveIDs, id)
+							}
+						}
 
-					return allowed, nil
+						if len(nonArchiveIDs) == 0 {
+							return archiveAllowed, nil
+						}
+
+						// Check regular restrictions for non-archive motions
+						regularAllowed, err := m.checkStateRestrictions(ctx, ds, perms, requestUser, restrictions, nonArchiveIDs)
+						if err != nil {
+							return nil, err
+						}
+
+						return append(archiveAllowed, regularAllowed...), nil
+					}
 				}
 
-				return nil, nil
+				return m.checkStateRestrictions(ctx, ds, perms, requestUser, restrictions, ids)
 			})
 		})
 	})
+}
+
+// checkStateRestrictions checks state restrictions for the given motion IDs
+func (m Motion) checkStateRestrictions(ctx context.Context, ds *dsfetch.Fetch, perms *perm.Permission, requestUser int, restrictions []string, ids []int) ([]int, error) {
+	hasIsSubmitterRestriction := false
+	for _, restriction := range restrictions {
+		if restriction == "is_submitter" {
+			hasIsSubmitterRestriction = true
+			continue
+		}
+
+		if perms.Has(perm.TPermission(restriction)) {
+			return ids, nil
+		}
+	}
+	if hasIsSubmitterRestriction {
+		allowed, err := eachCondition(ids, func(motionID int) (bool, error) {
+			submitter, err := isSubmitter(ctx, ds, requestUser, motionID)
+			if err != nil {
+				return false, fmt.Errorf("checking for motion submitter of motion %d: %w", motionID, err)
+			}
+
+			return submitter, nil
+		})
+		if err != nil {
+			return nil, fmt.Errorf("checking if user is submitter: %w", err)
+		}
+
+		return allowed, nil
+	}
+
+	return nil, nil
 }
 
 func (m Motion) modeB(ctx context.Context, ds *dsfetch.Fetch, motionIDs ...int) ([]int, error) {
