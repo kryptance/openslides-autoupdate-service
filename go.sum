@@ -51,8 +51,8 @@ github.com/klauspost/compress v1.18.2 h1:iiPHWW0YrcFgpBYhsA6D1+fqHssJscY/Tm/y2Uq
 github.com/klauspost/compress v1.18.2/go.mod h1:R0h/fSBs8DE4ENlcrlib3PsXS61voFxhIs2DeRhCvJ4=
 github.com/klauspost/cpuid/v2 v2.3.0 h1:S4CRMLnYUhGeDFDqkGriYKdfoFlDnMtqTiI/sFzhA9Y=
 github.com/klauspost/cpuid/v2 v2.3.0/go.mod h1:hqwkgyIinND0mEev00jJYCxPNVRVXFQeu1XKlok6oO0=
-github.com/kryptance/openslides-go v0.0.0-20260116201606-2e180cc466c5 h1:FM14NKFHdGDWRMRIBFovZG+3+THWK27sD4KUOykprQ0=
-github.com/kryptance/openslides-go v0.0.0-20260116201606-2e180cc466c5/go.mod h1:Xv/9Hgj50/eBjh4k3iq4zOMVDLk76VoeFKhecE4yc7g=
+github.com/kryptance/openslides-go v0.0.0-20260117072955-a44ea0e02365 h1:ZeN2k5QT/Ox+m8Kh7gEFFt2pIshSyig05TqY5Etx5Ik=
+github.com/kryptance/openslides-go v0.0.0-20260117072955-a44ea0e02365/go.mod h1:Xv/9Hgj50/eBjh4k3iq4zOMVDLk76VoeFKhecE4yc7g=
 github.com/moby/docker-image-spec v1.3.1 h1:jMKff3w6PgbfSa69GfNg+zN/XLhfXJGnEx3Nl2EsFP0=
 github.com/moby/docker-image-spec v1.3.1/go.mod h1:eKmb5VW8vQEh/BAr2yvVNvuiJuY6UIocYsFu/DxxRpo=
 github.com/moby/sys/user v0.4.0 h1:jhcMKit7SA80hivmFJcbB1vqmw//wU61Zdui2eQXuMs=
